@@ -4,10 +4,19 @@ on:
   push:
     branches: [ "main", "master" ]
   workflow_dispatch:
+    inputs:
+      upload_vendor:
+        description: 'Upload folder vendor/? (Pilih true HANYA jika Anda baru menambahkan library composer baru)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 jobs:
   build-and-deploy:
-    name: Build Assets & Deploy ke Rumahweb
+    name: Build Assets & Deploy Cepat ke Rumahweb
     runs-on: ubuntu-latest
 
     steps:
@@ -43,7 +52,14 @@ jobs:
           rm -rf tests/
           rm -f .env
 
-      # 4. Cek apakah rahasia FTP sudah dikonfigurasi
+      # 4. Hapus folder vendor jika tidak diminta upload ulang (Super Cepat < 15 detik)
+      - name: Optimasi Kecepatan Deploy (Exclude Vendor by Default)
+        if: github.event.inputs.upload_vendor != 'true'
+        run: |
+          echo "Melewati upload folder vendor/ agar deploy selesai dalam hitungan detik..."
+          rm -rf vendor/
+
+      # 5. Cek apakah rahasia FTP sudah dikonfigurasi
       - name: Cek Konfigurasi FTP Secret
         id: check_ftp
         run: |
@@ -54,7 +70,7 @@ jobs:
             echo "SKIP_FTP=false" >> $GITHUB_ENV
           fi
 
-      # 5. Upload ke cPanel Rumahweb via FTP Deploy Action jika secret sudah diatur
+      # 6. Upload ke cPanel Rumahweb via FTP Deploy Action
       - name: Deploy ke cPanel Rumahweb (bpsdashboard.wisatasemoyo.site)
         if: env.SKIP_FTP == 'false'
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
@@ -71,18 +87,3 @@ jobs:
             **/storage/logs/**
             **/storage/framework/cache/**
             **/storage/framework/sessions/**
-
-      - name: Beri Notifikasi Jika FTP Secret Belum Diisi
-        if: env.SKIP_FTP == 'true'
-        run: |
-          echo "=========================================================================="
-          echo "⚠️  PERHATIAN: PENGIRIMAN FILE KE HOSTING DILEWATI (SKIPPED)"
-          echo "=========================================================================="
-          echo "Build Laravel & Vite berhasil dilakukan di GitHub Runner!"
-          echo "Namun pengiriman via FTP tidak dilakukan karena secret FTP belum diisi."
-          echo "Silakan tambahkan rahasia berikut di GitHub Repository Settings > Secrets:"
-          echo "  1. FTP_SERVER     (misal: ftp.wisatasemoyo.site)"
-          echo "  2. FTP_USERNAME   (username cPanel / FTP Anda)"
-          echo "  3. FTP_PASSWORD   (password cPanel / FTP Anda)"
-          echo "  4. FTP_SERVER_DIR (misal: /bpsdashboard.wisatasemoyo.site/)"
-          echo "=========================================================================="

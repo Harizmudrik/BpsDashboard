@@ -278,10 +278,20 @@ class DashboardController extends Controller
             ->orderBy('tahun', 'desc')
             ->get();
 
+        $periodeOrder = [
+            'Januari' => 1, 'Februari' => 2, 'Maret' => 3, 'April' => 4,
+            'Mei' => 5, 'Juni' => 6, 'Juli' => 7, 'Agustus' => 8,
+            'September' => 9, 'Oktober' => 10, 'November' => 11, 'Desember' => 12,
+            'Semester 1 (Maret)' => 13, 'Semester 2 (September)' => 14, 'Tahunan' => 15,
+        ];
         $periodes = BpsStatistic::where('metric', $metric)
             ->select('periode')
             ->distinct()
-            ->get();
+            ->get()
+            ->sortBy(function ($item) use ($periodeOrder) {
+                return $periodeOrder[$item->periode] ?? 99;
+            })
+            ->values();
 
         $provinsis = [];
         if ($config['is_provincial']) {
@@ -431,6 +441,14 @@ class DashboardController extends Controller
             }
         }
 
+        // Calculate position vs average
+        $positionVsAvg = null;
+        if ($avgValue > 0) {
+            $positionVsAvg = round($overallValue - $avgValue, 2);
+        }
+
+        $prevValue = $prevNationalRecord ? round((float)$prevNationalRecord->value, 2) : null;
+
         $summary = [
             'value' => number_format($overallValue, $metric === 'gini_ratio' ? 3 : 2),
             'avg_val' => number_format($avgValue, $metric === 'gini_ratio' ? 3 : 2),
@@ -441,6 +459,9 @@ class DashboardController extends Controller
             'current_year' => $activeYear,
             'current_periode' => $activePeriode,
             'trend' => $trend,
+            'prev_year' => $prevYear,
+            'prev_value' => $prevValue !== null ? number_format($prevValue, $metric === 'gini_ratio' ? 3 : 2) : null,
+            'position_vs_avg' => $positionVsAvg,
         ];
 
         // 3. Line Chart Trend: Trend over years

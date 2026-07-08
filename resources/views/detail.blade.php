@@ -245,10 +245,65 @@
             border-radius: 100px;
             display: inline-flex;
             align-items: center;
+            cursor: help;
+            position: relative;
         }
+        /* Normative: hijau = perbaikan, merah = memburuk */
+        .trend-badge.trend-good { background: #dcfce7; color: #15803d; }
+        .trend-badge.trend-bad { background: #fee2e2; color: #b91c1c; }
+        .trend-badge.neutral { background: #f1f5f9; color: #64748b; }
+        /* Legacy fallback */
         .trend-badge.up { background: #fee2e2; color: #b91c1c; }
         .trend-badge.down { background: #dcfce7; color: #15803d; }
-        .trend-badge.neutral { background: #f1f5f9; color: #64748b; }
+
+        /* Tooltip for trend explanation */
+        .trend-tooltip {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: #f8fafc;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1.5;
+            white-space: normal;
+            width: 320px;
+            max-width: 90vw;
+            z-index: 50;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+            text-align: left;
+        }
+        .trend-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #1e293b;
+        }
+        .trend-badge:hover .trend-tooltip {
+            display: block;
+        }
+
+        /* Position vs average info */
+        .position-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 100px;
+            margin-left: 4px;
+        }
+        .position-info.above { background: #fef3c7; color: #92400e; }
+        .position-info.below { background: #dbeafe; color: #1e40af; }
+        .position-info.equal { background: #f1f5f9; color: #64748b; }
 
         /* Visualization Layouts */
         .visual-row {
@@ -935,13 +990,23 @@
             <!-- Overall card value -->
             <div class="stat-card blue">
                 <div>
-                    <div style="display:flex; justify-content:space-between; align-items:start;">
+                    <div style="display:flex; justify-content:space-between; align-items:start; flex-wrap:wrap; gap:4px;">
                         <p class="stat-label" x-text="filters.provinsi === 'all' ? 'Nilai Nasional (BPS)' : ('Nilai ' + getWilayahDisplayName(filters.provinsi))"></p>
-                        <template x-if="summary.trend !== null && summary.trend !== undefined">
-                            <span class="trend-badge" :class="summary.trend < 0 ? 'down' : 'up'">
-                                <span x-text="(summary.trend > 0 ? '▲ +' : '▼ ') + summary.trend + '%'"></span>
-                            </span>
-                        </template>
+                        <div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;">
+                            <!-- YoY Trend Badge with Normative Coloring + Tooltip -->
+                            <template x-if="summary.trend !== null && summary.trend !== undefined">
+                                <span class="trend-badge" :class="getTrendColorClass(summary.trend)">
+                                    <span x-text="(summary.trend > 0 ? '▲ +' : (summary.trend < 0 ? '▼ ' : '● ')) + summary.trend + ' poin'"></span>
+                                    <span class="trend-tooltip" x-html="getTrendTooltipHTML()"></span>
+                                </span>
+                            </template>
+                            <!-- Position vs Average Badge -->
+                            <template x-if="summary.position_vs_avg !== null && summary.position_vs_avg !== undefined && filters.provinsi !== 'all'">
+                                <span class="position-info" :class="summary.position_vs_avg > 0 ? 'above' : (summary.position_vs_avg < 0 ? 'below' : 'equal')">
+                                    <span x-text="summary.position_vs_avg > 0 ? '↑ Di atas rata-rata' : (summary.position_vs_avg < 0 ? '↓ Di bawah rata-rata' : '= Sama dengan rata-rata')"></span>
+                                </span>
+                            </template>
+                        </div>
                     </div>
                     <p class="stat-value">
                         <span x-text="summary.value">-</span><span class="stat-unit">{{ $config['unit'] }}</span>
@@ -958,7 +1023,7 @@
                         <span x-text="summary.avg_val">-</span><span class="stat-unit">{{ $config['unit'] }}</span>
                     </p>
                 </div>
-                <p class="stat-meta">Rata-rata hitung (unweighted) dari semua data provinsi</p>
+                <p class="stat-meta">Rata-rata hitung (<em>unweighted arithmetic mean</em>) dari seluruh data provinsi/kategori pada periode aktif</p>
             </div>
 
             <!-- Maximum Value -->
@@ -981,6 +1046,32 @@
                     </p>
                 </div>
                 <p class="stat-meta" x-text="summary.min_name">-</p>
+            </div>
+        </section>
+
+        <!-- Keterangan Metodologi Summary Cards -->
+        <section style="margin-bottom: 24px; padding: 16px 20px; border-radius: 12px; background: linear-gradient(135deg, #f0f9ff 0%, #f8fafc 100%); border: 1px solid #bfdbfe;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                <svg width="18" height="18" fill="none" stroke="#2563eb" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <h4 style="font-size:13px; font-weight:700; color:#1e40af;">Keterangan Metodologi Perhitungan Summary Cards</h4>
+            </div>
+            <div style="font-size:12px; color:#334155; line-height:1.7;">
+                <p style="margin-bottom:6px;">
+                    <strong style="color:#2563eb;">① Badge Tren YoY (Year-on-Year):</strong>
+                    Menunjukkan <strong>selisih nilai absolut</strong> wilayah/nasional pada periode aktif dibandingkan periode yang sama tahun sebelumnya.
+                    <template x-if="summary.prev_value !== null && summary.prev_value !== undefined">
+                        <span>Rumus: <code style="background:#e2e8f0; padding:1px 6px; border-radius:4px; font-size:11px;" x-text="summary.value + ' - ' + summary.prev_value + ' = ' + (summary.trend > 0 ? '+' : '') + summary.trend + ' poin'"></code></span>
+                    </template>
+                </p>
+                <p style="margin-bottom:6px;" x-html="getTrendColorExplanation()"></p>
+                <p style="margin-bottom:6px;">
+                    <strong style="color:#ea580c;">② Rata-rata Seluruh Provinsi:</strong>
+                    Dihitung menggunakan rata-rata hitung sederhana (<em>unweighted arithmetic mean</em>) dari seluruh provinsi/kategori, sebagai titik pembanding nasional. Jika wilayah terpilih berada di <strong>atas</strong> rata-rata ini, badge kuning <em>"↑ Di atas rata-rata"</em> akan muncul. Sebaliknya, badge biru <em>"↓ Di bawah rata-rata"</em> menandakan wilayah tersebut berada di bawah rata-rata nasional.
+                </p>
+                <p style="margin-bottom:0;">
+                    <strong style="color:#dc2626;">③ Nilai Tertinggi</strong> & <strong style="color:#16a34a;">④ Nilai Terendah:</strong>
+                    Menampilkan provinsi/kategori dengan nilai <em>maximum</em> dan <em>minimum</em> pada tahun dan periode aktif yang dipilih, menjadi pembanding batas atas dan batas bawah distribusi data.
+                </p>
             </div>
         </section>
 
@@ -1363,7 +1454,10 @@
                     min_name: '-',
                     current_year: '-',
                     current_periode: '-',
-                    trend: null
+                    trend: null,
+                    prev_year: null,
+                    prev_value: null,
+                    position_vs_avg: null
                 },
                 tableSearchQuery: '',
                 currentPage: 1,
@@ -1385,6 +1479,72 @@
                     }
                     this.updateDashboard();
                     this.$watch('tableSearchQuery', () => { this.currentPage = 1; });
+                },
+
+                // Determine if increase is bad for this metric (normative logic)
+                isIncreaseBadMetric() {
+                    return ['tpt', 'gini_ratio', 'kemiskinan', 'inflasi_tahunan', 'inflasi_bulanan'].includes(this.metric);
+                },
+
+                // Get normative CSS class for trend badge
+                getTrendColorClass(trendValue) {
+                    if (trendValue === 0) return 'neutral';
+                    const isIncreaseBad = this.isIncreaseBadMetric();
+                    if (trendValue > 0) {
+                        return isIncreaseBad ? 'trend-bad' : 'trend-good';
+                    } else {
+                        return isIncreaseBad ? 'trend-good' : 'trend-bad';
+                    }
+                },
+
+                // Generate tooltip HTML for trend badge (hover explanation)
+                getTrendTooltipHTML() {
+                    const t = this.summary.trend;
+                    if (t === null || t === undefined) return '';
+                    const isIncreaseBad = this.isIncreaseBadMetric();
+                    const direction = t > 0 ? 'naik' : (t < 0 ? 'turun' : 'stabil');
+                    const absT = Math.abs(t);
+                    const label = this.metricLabel();
+                    const prevY = this.summary.prev_year || '-';
+                    const curY = this.summary.current_year || '-';
+                    const prevV = this.summary.prev_value || '-';
+                    const curV = this.summary.value || '-';
+
+                    let meaning = '';
+                    if (t > 0) {
+                        meaning = isIncreaseBad
+                            ? `<span style="color:#fca5a5;">⚠ Memburuk:</span> Kenaikan ${label} menandakan tekanan sosial-ekonomi yang meningkat.`
+                            : `<span style="color:#86efac;">✓ Membaik:</span> Kenaikan ${label} menandakan perbaikan performa ekonomi.`;
+                    } else if (t < 0) {
+                        meaning = isIncreaseBad
+                            ? `<span style="color:#86efac;">✓ Membaik:</span> Penurunan ${label} menandakan perbaikan kondisi sosial-ekonomi.`
+                            : `<span style="color:#fca5a5;">⚠ Memburuk:</span> Penurunan ${label} menandakan perlambatan ekonomi.`;
+                    } else {
+                        meaning = `<span style="color:#94a3b8;">● Stabil:</span> Tidak ada perubahan signifikan.`;
+                    }
+
+                    return `<strong>Perhitungan Tren YoY:</strong><br>` +
+                        `${label} (${curY}) = ${curV}<br>` +
+                        `${label} (${prevY}) = ${prevV}<br>` +
+                        `Selisih: ${curV} − ${prevV} = <strong>${t > 0 ? '+' : ''}${t} poin</strong><br><br>` +
+                        meaning;
+                },
+
+                // Generate explanation text for trend color in methodology section
+                getTrendColorExplanation() {
+                    const isIncreaseBad = this.isIncreaseBadMetric();
+                    const label = this.metricLabel();
+                    if (isIncreaseBad) {
+                        return `<strong style="color:#2563eb;">Logika Pewarnaan untuk ${label}:</strong> ` +
+                            `<span style="background:#dcfce7;color:#15803d;padding:1px 6px;border-radius:100px;font-size:11px;font-weight:700;">▼ Hijau = Perbaikan (turun)</span> ` +
+                            `<span style="background:#fee2e2;color:#b91c1c;padding:1px 6px;border-radius:100px;font-size:11px;font-weight:700;">▲ Merah = Memburuk (naik)</span> — ` +
+                            `Karena indikator ini bersifat <em>negatif</em> (semakin kecil semakin baik), penurunan nilai dinilai sebagai perbaikan kondisi.`;
+                    } else {
+                        return `<strong style="color:#2563eb;">Logika Pewarnaan untuk ${label}:</strong> ` +
+                            `<span style="background:#dcfce7;color:#15803d;padding:1px 6px;border-radius:100px;font-size:11px;font-weight:700;">▲ Hijau = Perbaikan (naik)</span> ` +
+                            `<span style="background:#fee2e2;color:#b91c1c;padding:1px 6px;border-radius:100px;font-size:11px;font-weight:700;">▼ Merah = Memburuk (turun)</span> — ` +
+                            `Karena indikator ini bersifat <em>positif</em> (semakin besar semakin baik), kenaikan nilai dinilai sebagai perbaikan performa.`;
+                    }
                 },
 
                 getWilayahDisplayName(code) {

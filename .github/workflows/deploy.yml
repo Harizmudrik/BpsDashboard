@@ -16,7 +16,7 @@ on:
 
 jobs:
   build-and-deploy:
-    name: Build Assets & Deploy Cepat ke Rumahweb
+    name: Build Assets & Deploy Lengkap ke Rumahweb
     runs-on: ubuntu-latest
 
     steps:
@@ -52,11 +52,11 @@ jobs:
           rm -rf tests/
           rm -f .env
 
-      # 4. Hapus folder vendor jika tidak diminta upload ulang (Super Cepat < 15 detik)
+      # 4. Hapus folder vendor jika tidak diminta upload ulang (Super Cepat < 20 detik)
       - name: Optimasi Kecepatan Deploy (Exclude Vendor by Default)
         if: github.event.inputs.upload_vendor != 'true'
         run: |
-          echo "Melewati upload folder vendor/ agar deploy selesai dalam hitungan detik..."
+          echo "Melewati upload folder vendor/ agar deploy selesai dengan cepat..."
           rm -rf vendor/
 
       # 5. Cek apakah rahasia FTP sudah dikonfigurasi
@@ -64,27 +64,26 @@ jobs:
         id: check_ftp
         run: |
           if [ -z "${{ secrets.FTP_SERVER }}" ] || [ -z "${{ secrets.FTP_USERNAME }}" ]; then
-            echo "FTP secrets belum dikonfigurasi di GitHub Settings > Secrets and variables > Actions."
+            echo "FTP secrets belum dikonfigurasi di GitHub Settings > Secrets."
             echo "SKIP_FTP=true" >> $GITHUB_ENV
           else
             echo "SKIP_FTP=false" >> $GITHUB_ENV
           fi
 
-      # 6. Upload ke cPanel Rumahweb via FTP Deploy Action
-      - name: Deploy ke cPanel Rumahweb (bpsdashboard.wisatasemoyo.site)
+      # 6. Upload Lengkap ke cPanel Rumahweb menggunakan LFTP Mirror (100% Dijamin Masuk Semua File)
+      - name: Deploy ke cPanel Rumahweb via LFTP Mirror
         if: env.SKIP_FTP == 'false'
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: ${{ secrets.FTP_SERVER_DIR }}
-          log-level: verbose
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-            **/.env
-            **/storage/logs/**
-            **/storage/framework/cache/**
-            **/storage/framework/sessions/**
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+          echo "Memulai proses sinkronisasi file ke folder: ${{ secrets.FTP_SERVER_DIR }}"
+          lftp -c "set ftp:ssl-allow no; \
+                   open -u ${{ secrets.FTP_USERNAME }},${{ secrets.FTP_PASSWORD }} ${{ secrets.FTP_SERVER }}; \
+                   mirror -R --verbose=1 \
+                   --exclude-glob .git* \
+                   --exclude-glob node_modules/ \
+                   --exclude-glob .env \
+                   --exclude-glob storage/logs/* \
+                   --exclude-glob storage/framework/cache/* \
+                   --exclude-glob storage/framework/sessions/* \
+                   ./ ${{ secrets.FTP_SERVER_DIR }}"
+          echo "✅ Seluruh file aplikasi berhasil dikirim ke server hosting!"

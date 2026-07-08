@@ -1,0 +1,61 @@
+name: Deploy Laravel ke Rumahweb Shared Hosting (cPanel)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    name: Build Assets & Deploy ke Rumahweb
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Kode Repositori
+        uses: actions/checkout@v4
+
+      # 1. Setup PHP & Install Composer di GitHub Runner
+      - name: Setup PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, bcmath, curl, pdo, pdo_mysql, zip, gd
+
+      - name: Install Composer Production Dependencies
+        run: composer install --prefer-dist --no-dev --no-progress --no-interaction --optimize-autoloader
+
+      # 2. Setup Node.js & Build Frontend Assets (Vite) di GitHub Runner
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Compile Frontend Assets (Vite Build)
+        run: |
+          npm ci || npm install
+          npm run build
+
+      # 3. Hapus file yang tidak perlu dikirim ke Shared Hosting
+      - name: Bersihkan File Sementara Sebelum Upload
+        run: |
+          rm -rf node_modules/
+          rm -rf tests/
+          rm -f .env
+
+      # 4. Upload ke cPanel Rumahweb via FTP Deploy Action
+      - name: Deploy ke cPanel Rumahweb (bpsdashboard.wisatasemoyo.site)
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: ${{ secrets.FTP_SERVER_DIR }} # Contoh: /public_html/bpsdashboard/ atau /bpsdashboard.wisatasemoyo.site/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/.env
+            **/storage/logs/**
+            **/storage/framework/cache/**
+            **/storage/framework/sessions/**

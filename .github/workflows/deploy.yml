@@ -1,0 +1,88 @@
+name: Deploy Laravel ke Rumahweb Shared Hosting (cPanel)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    name: Build Assets & Deploy ke Rumahweb
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Kode Repositori
+        uses: actions/checkout@v4
+
+      # 1. Setup PHP & Install Composer di GitHub Runner
+      - name: Setup PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, bcmath, curl, pdo, pdo_mysql, zip, gd
+
+      - name: Install Composer Production Dependencies
+        run: composer install --prefer-dist --no-dev --no-progress --no-interaction --optimize-autoloader
+
+      # 2. Setup Node.js & Build Frontend Assets (Vite) di GitHub Runner
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Compile Frontend Assets (Vite Build)
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+
+      # 3. Hapus file sementara sebelum upload
+      - name: Bersihkan File Sementara Sebelum Upload
+        run: |
+          rm -rf node_modules/
+          rm -rf tests/
+          rm -f .env
+
+      # 4. Cek apakah rahasia FTP sudah dikonfigurasi
+      - name: Cek Konfigurasi FTP Secret
+        id: check_ftp
+        run: |
+          if [ -z "${{ secrets.FTP_SERVER }}" ] || [ -z "${{ secrets.FTP_USERNAME }}" ]; then
+            echo "FTP secrets belum dikonfigurasi di GitHub Settings > Secrets and variables > Actions."
+            echo "SKIP_FTP=true" >> $GITHUB_ENV
+          else
+            echo "SKIP_FTP=false" >> $GITHUB_ENV
+          fi
+
+      # 5. Upload ke cPanel Rumahweb via FTP Deploy Action jika secret sudah diatur
+      - name: Deploy ke cPanel Rumahweb (bpsdashboard.wisatasemoyo.site)
+        if: env.SKIP_FTP == 'false'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/.env
+            **/storage/logs/**
+            **/storage/framework/cache/**
+            **/storage/framework/sessions/**
+
+      - name: Beri Notifikasi Jika FTP Secret Belum Diisi
+        if: env.SKIP_FTP == 'true'
+        run: |
+          echo "=========================================================================="
+          echo "⚠️  PERHATIAN: PENGIRIMAN FILE KE HOSTING DILEWATI (SKIPPED)"
+          echo "=========================================================================="
+          echo "Build Laravel & Vite berhasil dilakukan di GitHub Runner!"
+          echo "Namun pengiriman via FTP tidak dilakukan karena secret FTP belum diisi."
+          echo "Silakan tambahkan rahasia berikut di GitHub Repository Settings > Secrets:"
+          echo "  1. FTP_SERVER     (misal: ftp.wisatasemoyo.site)"
+          echo "  2. FTP_USERNAME   (username cPanel / FTP Anda)"
+          echo "  3. FTP_PASSWORD   (password cPanel / FTP Anda)"
+          echo "  4. FTP_SERVER_DIR (misal: /bpsdashboard.wisatasemoyo.site/)"
+          echo "=========================================================================="
